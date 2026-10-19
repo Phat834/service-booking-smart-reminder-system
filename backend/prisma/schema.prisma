@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+  CUSTOMER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  fullName     String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  phone        String?
+  createdAt    DateTime @default(now())
+
+  bookingsAsCustomer Booking[]     @relation("CustomerBookings")
+  bookingsAsStaff   Booking[]     @relation("StaffBookings")
+  notifications     Notification[]
+}
+
+model Service {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String
+  description     String?
+  durationMinutes Int
+  price           Decimal  @db.Decimal(10, 2)
+  isActive        Boolean  @default(true)
+
+  bookings Booking[]
+}
+
+model TimeSlot {
+  id        String   @id @default(uuid()) @db.Uuid
+  startTime String
+  endTime   String
+
+  bookings Booking[]
+}
+
+model Booking {
+  id           String        @id @default(uuid()) @db.Uuid
+  customerId   String        @db.Uuid
+  staffId      String        @db.Uuid
+  serviceId    String        @db.Uuid
+  timeSlotId   String        @db.Uuid
+  bookingDate  DateTime      @db.Date
+  status       BookingStatus @default(PENDING)
+  notes        String?
+  isReminderSent Boolean     @default(false)
+  version      Int           @default(1)
+  createdAt    DateTime      @default(now())
+
+  customer User      @relation("CustomerBookings", fields: [customerId], references: [id])
+  staff    User      @relation("StaffBookings", fields: [staffId], references: [id])
+  service  Service   @relation(fields: [serviceId], references: [id])
+  timeSlot TimeSlot  @relation(fields: [timeSlotId], references: [id])
+
+  @@index([staffId, bookingDate, timeSlotId])
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
