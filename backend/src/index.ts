@@ -1,4 +1,5 @@
-import express, { Request, Response, NextFunction } from 'express';
+﻿import express, { Request, Response, NextFunction } from 'express';
+import authRoutes from './routes/auth.routes';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
@@ -12,6 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 // Health check route
+app.use('/api/auth', authRoutes);
 app.get('/api/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok' });
 });
