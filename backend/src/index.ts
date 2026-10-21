@@ -1,6 +1,7 @@
 ﻿import serviceRoutes from './routes/service.routes';
 import userRoutes from './routes/user.routes';
 import slotRoutes from './routes/slot.routes';
+import bookingRoutes from './routes/booking.routes';
 import express, { Request, Response, NextFunction } from 'express';
 import authRoutes from './routes/auth.routes';
 import cors from 'cors';
@@ -20,6 +21,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api', userRoutes);
 app.use('/api/slots', slotRoutes);
+app.use('/api/bookings', bookingRoutes);
 app.get('/api/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok' });
 });
