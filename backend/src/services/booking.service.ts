@@ -1,5 +1,7 @@
 import { BookingStatus, Prisma, Role } from '@prisma/client';
 import { prisma } from '../config/prisma';
+import { createNotification } from './notification.service';
+import { sseService } from './sse.service';
 
 export const SLOT_CONFLICT_MESSAGE =
   'Khung giờ này vừa có người đặt, vui lòng chọn khung giờ khác!';
@@ -176,7 +178,7 @@ export const createBooking = async (
           throw new BookingValidationError('Khung giờ không tồn tại!');
         }
 
-        return tx.booking.create({
+        const booking = await tx.booking.create({
           data: {
             customerId: input.customerId,
             staffId: input.staffId,
@@ -188,6 +190,14 @@ export const createBooking = async (
           },
           include: bookingInclude,
         });
+
+        await createNotification({
+          userId: booking.staffId,
+          title: 'Lich hen moi',
+          message: 'Khach hang ' + booking.customer.fullName + ' da dat lich hen moi',
+        });
+
+        return booking;
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -348,7 +358,17 @@ export const updateBookingStatus = async (
     throw new BookingConflictError(BOOKING_UPDATED_CONFLICT_MESSAGE);
   }
 
-  return getBookingById(booking.id);
+  const updatedBooking = await getBookingById(booking.id);
+
+  if (status === BookingStatus.CONFIRMED || status === BookingStatus.CANCELLED) {
+    await createNotification({
+      userId: updatedBooking.customerId,
+      title: status === BookingStatus.CONFIRMED ? 'Lich hen da duoc xac nhan' : 'Lich hen da bi huy',
+      message: status === BookingStatus.CONFIRMED ? 'Lich hen cua ban da duoc xac nhan' : 'Lich hen cua ban da bi huy',
+    });
+  }
+
+  return updatedBooking;
 };
 
 export const isBookingStatus = (value: string): value is BookingStatus =>
