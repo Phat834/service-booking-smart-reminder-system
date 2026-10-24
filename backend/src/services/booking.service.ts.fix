@@ -1,0 +1,22 @@
+﻿const parseDateOnly = (value: string): Date => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  if (!match) {
+    throw new BookingValidationError('bookingDate không hợp lệ, cần định dạng YYYY-MM-DD!');
+  }
+  const [, year, month, day] = match;
+  const date = new Date(\\-\-\T00:00:00.000Z\);
+  if (Number.isNaN(date.getTime())) {
+    throw new BookingValidationError('bookingDate không hợp lệ, cần định dạng YYYY-MM-DD!');
+  }
+  return date;
+};
+
+const resolvePagination = (filters: BookingFilters): { page: number; limit: number } => {
+  const page = Number.isFinite(filters.page) && (filters.page as number) > 0 ? Math.floor(filters.page as number) : 1;
+  const limit =
+    Number.isFinite(filters.limit) && (filters.limit as number) > 0
+      ? Math.min(100, Math.floor(filters.limit as number))
+      : 20;
+
+  return { page, limit };
+};

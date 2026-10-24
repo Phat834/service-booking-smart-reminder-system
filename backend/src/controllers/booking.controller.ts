@@ -11,6 +11,8 @@ import {
   listBookings,
   listMyBookings,
   updateBookingStatus,
+  rescheduleBooking,
+  reviewBooking,
 } from '../services/booking.service';
 
 const parseFilters = (req: Request) => {
@@ -138,7 +140,7 @@ export const patchBookingStatus = async (
 
     if (!status || !isBookingStatus(status) || !STAFF_UPDATABLE_STATUSES.includes(status)) {
       res.status(400).json({
-        message: 'status không hợp lệ, chỉ nhận CONFIRMED, COMPLETED hoặc CANCELLED!',
+        message: 'status không hợp lệ, chỉ nhận PENDING/CONFIRMED/IN_PROGRESS/COMPLETED/CANCELLED/NO_SHOW!',
       });
       return;
     }
@@ -154,6 +156,96 @@ export const patchBookingStatus = async (
       res.status(409).json({ message: error.message, code: error.code });
       return;
     }
+    if (error instanceof BookingNotFoundError) {
+      res.status(404).json({ message: error.message, code: error.code });
+      return;
+    }
+    if (error instanceof BookingForbiddenError) {
+      res.status(403).json({ message: error.message, code: error.code });
+      return;
+    }
+    if (error instanceof BookingValidationError) {
+      res.status(400).json({ message: error.message, code: error.code });
+      return;
+    }
+    next(error);
+  }
+};
+
+export const rescheduleBookingHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const { id } = req.params;
+    const { bookingDate, timeSlotId, staffId } = req.body;
+
+    if (!bookingDate || !timeSlotId) {
+      res.status(400).json({ message: 'bookingDate và timeSlotId là bắt buộc!' });
+      return;
+    }
+
+    const booking = await rescheduleBooking(
+      id,
+      { bookingDate, timeSlotId, staffId },
+      { userId: req.user.userId, role: req.user.role }
+    );
+
+    res.status(200).json({ booking });
+  } catch (error) {
+    if (error instanceof BookingConflictError) {
+      res.status(409).json({ message: error.message, code: error.code });
+      return;
+    }
+    if (error instanceof BookingNotFoundError) {
+      res.status(404).json({ message: error.message, code: error.code });
+      return;
+    }
+    if (error instanceof BookingForbiddenError) {
+      res.status(403).json({ message: error.message, code: error.code });
+      return;
+    }
+    if (error instanceof BookingValidationError) {
+      res.status(400).json({ message: error.message, code: error.code });
+      return;
+    }
+    next(error);
+  }
+};
+
+export const reviewBookingHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const { id } = req.params;
+    const { rating, reviewComment } = req.body;
+
+    if (rating === undefined || rating === null) {
+      res.status(400).json({ message: 'rating là bắt buộc!' });
+      return;
+    }
+
+    const booking = await reviewBooking(
+      id,
+      { rating: Number(rating), reviewComment },
+      { userId: req.user.userId, role: req.user.role }
+    );
+
+    res.status(200).json({ booking });
+  } catch (error) {
     if (error instanceof BookingNotFoundError) {
       res.status(404).json({ message: error.message, code: error.code });
       return;

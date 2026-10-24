@@ -20,3 +20,6 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 Thumbs.db
+
+# AI Agent Config (local, not tracked)
+.agentignore

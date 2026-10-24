@@ -14,6 +14,7 @@ export interface Service {
   description?: string | null;
   durationMinutes: number;
   price: number;
+  bufferMinutes?: number;
   isActive: boolean;
 }
 
@@ -22,6 +23,8 @@ export interface Staff {
   fullName: string;
   email: string;
   phone?: string | null;
+  bookingCount?: number;
+  averageRating?: number | null;
 }
 
 export interface TimeSlot {
@@ -31,7 +34,7 @@ export interface TimeSlot {
   isBooked?: boolean;
 }
 
-export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
 
 export interface Booking {
   id: string;
@@ -45,6 +48,9 @@ export interface Booking {
   staff: User;
   service: Service;
   timeSlot: TimeSlot;
+  rating?: number | null;
+  reviewComment?: string | null;
+  isReminder2hSent?: boolean;
 }
 
 export interface Notification {
@@ -64,4 +70,29 @@ export interface BookingListResult {
     total: number;
     totalPages: number;
   };
+}
+
+export interface AdminStats {
+  actualRevenue: number;
+  expectedRevenue: number;
+  totalRevenue: number;
+  totalBookings: number;
+  completedBookings: number;
+  cancelledBookings: number;
+  noShowBookings: number;
+  occupancyRate: number;
+  cancellationRate: number;
+  noShowRate: number;
+  bookingsByStatus: Record<BookingStatus, number>;
+  staffPerformance: StaffPerformance[];
+}
+
+export interface StaffPerformance {
+  staffId: string;
+  staffName: string;
+  staffEmail: string;
+  totalBookings: number;
+  completedBookings: number;
+  revenue: number;
+  averageRating?: number | null;
 }

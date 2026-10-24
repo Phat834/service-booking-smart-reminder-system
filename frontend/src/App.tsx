@@ -7,6 +7,9 @@ import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import HomePage from '@/pages/HomePage';
 import MyBookingsPage from '@/pages/MyBookingsPage';
+import BookingPage from '@/pages/BookingPage';
+import StaffDashboardPage from '@/pages/StaffDashboardPage';
+import AdminDashboardPage from '@/pages/AdminDashboardPage';
 
 const App = () => {
   const { isLoading } = useAuth();
@@ -38,6 +41,27 @@ const App = () => {
         <RoleGuard allowedRoles={['ADMIN', 'STAFF', 'CUSTOMER']}>
           <Layout>
             <MyBookingsPage />
+          </Layout>
+        </RoleGuard>
+      } />
+      <Route path="/booking" element={
+        <RoleGuard allowedRoles={['ADMIN', 'STAFF', 'CUSTOMER']}>
+          <Layout>
+            <BookingPage />
+          </Layout>
+        </RoleGuard>
+      } />
+      <Route path="/staff" element={
+        <RoleGuard allowedRoles={['STAFF', 'ADMIN']}>
+          <Layout>
+            <StaffDashboardPage />
+          </Layout>
+        </RoleGuard>
+      } />
+      <Route path="/admin" element={
+        <RoleGuard allowedRoles={['ADMIN']}>
+          <Layout>
+            <AdminDashboardPage />
           </Layout>
         </RoleGuard>
       } />

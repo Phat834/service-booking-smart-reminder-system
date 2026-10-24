@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/ToastProvider';
 import type { Notification } from '@/types';
@@ -8,19 +8,22 @@ import { Bell, LogOut, User } from 'lucide-react';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const Header: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
 
+  const token = localStorage.getItem('token');
+
   const fetchNotifications = useCallback(async () => {
+    if (!token || !user) return;
     try {
       const res = await fetch(`${API_URL}/notifications`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
+      if (res.status === 401) return;
       if (res.ok) {
         const data = await res.json();
         const notifs: Notification[] = data.notifications || [];
@@ -30,7 +33,7 @@ const Header: React.FC = () => {
     } catch {
       // silent
     }
-  }, [API_URL]);
+  }, [token, user]);
 
   const connectSSE = useCallback(() => {
     if (!isAuthenticated || !user) return;
@@ -72,10 +75,9 @@ const Header: React.FC = () => {
   }, [connectSSE]);
 
   useEffect(() => {
-    if (isAuthenticated && user) {
-      fetchNotifications();
-    }
-  }, [isAuthenticated, user, fetchNotifications]);
+    if (!token || !user) return;
+    fetchNotifications();
+  }, [token, user]);
 
   const markAsRead = async (id: string) => {
     try {
@@ -100,10 +102,11 @@ const Header: React.FC = () => {
   };
 
   const handleLogout = () => {
+    logout();
     if (eventSource) eventSource.close();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    navigate('/login');
+    window.location.href = '/login';
   };
 
   if (!isAuthenticated) return null;
@@ -130,22 +133,21 @@ const Header: React.FC = () => {
               {user?.role}
             </span>
             <nav className="flex items-center gap-3 border-l border-gray-300 pl-4">
-              <Link
-                to="/"
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  window.location.pathname === '/' ? 'text-brand-600 bg-brand-50' : 'text-gray-600 hover:text-brand-600 hover:bg-gray-50'
-                }`}
-              >
-                Đặt lịch
-              </Link>
-              <Link
-                to="/my-bookings"
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  window.location.pathname === '/my-bookings' ? 'text-brand-600 bg-brand-50' : 'text-gray-600 hover:text-brand-600 hover:bg-gray-50'
-                }`}
-              >
-                Lịch hẹn của tôi
-              </Link>
+              {user?.role === 'CUSTOMER' && (
+                <>
+                  <Link to="/" className="px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 hover:text-brand-600 hover:bg-gray-50">Đặt lịch</Link>
+                  <Link to="/my-bookings" className="px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 hover:text-brand-600 hover:bg-gray-50">Lịch hẹn của tôi</Link>
+                </>
+              )}
+              {user?.role === 'STAFF' && (
+                <Link to="/staff" className="px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 hover:text-brand-600 hover:bg-gray-50">Quản lý lịch hẹn</Link>
+              )}
+              {user?.role === 'ADMIN' && (
+                <>
+                  <Link to="/admin" className="px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 hover:text-brand-600 hover:bg-gray-50">Báo cáo thống kê</Link>
+                  <Link to="/staff" className="px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 hover:text-brand-600 hover:bg-gray-50">Quản lý lịch hẹn</Link>
+                </>
+              )}
             </nav>
           </div>
 

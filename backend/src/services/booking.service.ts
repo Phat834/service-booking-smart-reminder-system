@@ -1,53 +1,56 @@
-import { BookingStatus, Prisma, Role } from '@prisma/client';
-import { prisma } from '../config/prisma';
-import { createNotification } from './notification.service';
-import { sseService } from './sse.service';
+﻿ import { BookingStatus, Prisma, Role } from '@prisma/client';
+ import { prisma } from '../config/prisma';
+ import { createNotification } from './notification.service';
+ import { sseService } from './sse.service';
 
-export const SLOT_CONFLICT_MESSAGE =
-  'Khung giờ này vừa có người đặt, vui lòng chọn khung giờ khác!';
+ export const SLOT_CONFLICT_MESSAGE =
+   'Khung giá» nÃ y vá»«a cÃ³ ngÆ°á»i Ä‘áº·t, vui lÃ²ng chá»n khung giá» khÃ¡c!';
 
-export const BOOKING_UPDATED_CONFLICT_MESSAGE =
-  'Lịch hẹn vừa được cập nhật bởi người khác, vui lòng tải lại dữ liệu!';
+ export const BOOKING_UPDATED_CONFLICT_MESSAGE =
+   'Lá»‹ch háº¹n vá»«a Ä‘Æ°á»£c cáº­p nháº­t bá»Ÿi ngÆ°á»i khÃ¡c, vui lÃ²ng táº£i láº¡i dá»¯ liá»‡u!';
 
-export class BookingConflictError extends Error {
-  public readonly code = 'BOOKING_SLOT_CONFLICT';
+ export const FOUR_HOUR_CUTOFF_MESSAGE =
+   'ChÃ­nh sÃ¡ch hoÃ n/há»§y: Chá»‰ Ä‘Æ°á»£c phÃ©p há»§y hoáº·c Ä‘á»•i lá»‹ch trÆ°á»›c giá» háº¹n Ã­t nháº¥t 4 tiáº¿ng.';
 
-  constructor(message: string = SLOT_CONFLICT_MESSAGE) {
-    super(message);
-    this.name = 'BookingConflictError';
-    Object.setPrototypeOf(this, BookingConflictError.prototype);
-  }
-}
+ export class BookingConflictError extends Error {
+   public readonly code = 'BOOKING_SLOT_CONFLICT';
 
-export class BookingValidationError extends Error {
-  public readonly code = 'BOOKING_VALIDATION_ERROR';
+   constructor(message: string = SLOT_CONFLICT_MESSAGE) {
+     super(message);
+     this.name = 'BookingConflictError';
+     Object.setPrototypeOf(this, BookingConflictError.prototype);
+   }
+ }
 
-  constructor(message: string) {
-    super(message);
-    this.name = 'BookingValidationError';
-    Object.setPrototypeOf(this, BookingValidationError.prototype);
-  }
-}
+ export class BookingValidationError extends Error {
+   public readonly code = 'BOOKING_VALIDATION_ERROR';
 
-export class BookingNotFoundError extends Error {
-  public readonly code = 'BOOKING_NOT_FOUND';
+   constructor(message: string) {
+     super(message);
+     this.name = 'BookingValidationError';
+     Object.setPrototypeOf(this, BookingValidationError.prototype);
+   }
+ }
 
-  constructor(message: string = 'Không tìm thấy lịch hẹn!') {
-    super(message);
-    this.name = 'BookingNotFoundError';
-    Object.setPrototypeOf(this, BookingNotFoundError.prototype);
-  }
-}
+ export class BookingNotFoundError extends Error {
+   public readonly code = 'BOOKING_NOT_FOUND';
 
-export class BookingForbiddenError extends Error {
-  public readonly code = 'BOOKING_FORBIDDEN';
+   constructor(message: string = 'KhÃ´ng tÃ¬m tháº¥y lá»‹ch háº¹n!') {
+     super(message);
+     this.name = 'BookingNotFoundError';
+     Object.setPrototypeOf(this, BookingNotFoundError.prototype);
+   }
+ }
 
-  constructor(message: string = 'Forbidden: Không có quyền thực hiện thao tác này!') {
-    super(message);
-    this.name = 'BookingForbiddenError';
-    Object.setPrototypeOf(this, BookingForbiddenError.prototype);
-  }
-}
+ export class BookingForbiddenError extends Error {
+   public readonly code = 'BOOKING_FORBIDDEN';
+
+   constructor(message: string = 'Forbidden: KhÃ´ng cÃ³ quyá»n thá»±c hiá»‡n thao tÃ¡c nÃ y!') {
+     super(message);
+     this.name = 'BookingForbiddenError';
+     Object.setPrototypeOf(this, BookingForbiddenError.prototype);
+   }
+ }
 
 const bookingInclude = {
   customer: { select: { id: true, fullName: true, email: true, phone: true } },
@@ -86,26 +89,63 @@ export interface BookingListResult {
   };
 }
 
-export const STAFF_UPDATABLE_STATUSES: BookingStatus[] = [
-  BookingStatus.CONFIRMED,
-  BookingStatus.COMPLETED,
-  BookingStatus.CANCELLED,
-];
+ export interface ReviewBookingInput {
+   rating: number;
+   reviewComment?: string | null;
+ }
+
+ export interface RescheduleBookingInput {
+   bookingDate: string;
+   timeSlotId: string;
+   staffId?: string;
+ }
+
+ export const STAFF_UPDATABLE_STATUSES: BookingStatus[] = [
+   BookingStatus.CONFIRMED,
+   BookingStatus.IN_PROGRESS,
+   BookingStatus.COMPLETED,
+   BookingStatus.CANCELLED,
+   BookingStatus.NO_SHOW,
+ ];
 
 const isUuid = (value: string): boolean =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
-const parseDateOnly = (value: string): Date => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+ const parseTimeToMinutes = (time: string): number => {
+  const match = /^([0-9]{1,2}):([0-9]{2})$/.exec(time.trim());
   if (!match) {
-    throw new BookingValidationError('bookingDate không hợp lệ, cần định dạng YYYY-MM-DD!');
+    throw new BookingValidationError('timeSlot khÃ´ng há»£p lá»‡!');
   }
-  const [, year, month, day] = match;
-  const date = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) {
-    throw new BookingValidationError('bookingDate không hợp lệ, cần định dạng YYYY-MM-DD!');
-  }
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  return hours * 60 + minutes;
+};
+
+const getBookingStartDateTime = (bookingDate: Date | string, startTime: string): Date => {
+  const dateOnly = typeof bookingDate === 'string' ? bookingDate.trim().slice(0, 10) : bookingDate.toISOString().slice(0, 10);
+  const timeMinutes = parseTimeToMinutes(startTime);
+  const hours = Math.floor(timeMinutes / 60);
+  const mins = timeMinutes % 60;
+  const date = new Date(`${dateOnly}T00:00:00.000Z`);
+  date.setUTCHours(hours, mins, 0, 0);
   return date;
+};
+
+const enforceFourHourCutoff = (
+  actorRole: Role,
+  bookingDate: Date | string,
+  startTime: string,
+  now: Date = new Date()
+): void => {
+  if (actorRole === Role.ADMIN || actorRole === Role.STAFF) {
+    return;
+  }
+  const start = getBookingStartDateTime(bookingDate, startTime);
+  const diffMs = start.getTime() - now.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  if (diffHours < 4) {
+    throw new BookingValidationError(FOUR_HOUR_CUTOFF_MESSAGE);
+  }
 };
 
 const buildSlotLockKey = (staffId: string, bookingDate: string, timeSlotId: string): string =>
@@ -145,7 +185,7 @@ export const createBooking = async (
   input: CreateBookingInput
 ): Promise<BookingWithRelations> => {
   if (!isUuid(input.customerId) || !isUuid(input.staffId) || !isUuid(input.serviceId) || !isUuid(input.timeSlotId)) {
-    throw new BookingValidationError('Các định danh staffId, serviceId, timeSlotId không hợp lệ!');
+    throw new BookingValidationError('CÃ¡c Ä‘á»‹nh danh staffId, serviceId, timeSlotId khÃ´ng há»£p lá»‡!');
   }
 
   const bookingDate = parseDateOnly(input.bookingDate);
@@ -169,13 +209,13 @@ export const createBooking = async (
         ]);
 
         if (!staff || staff.role !== Role.STAFF) {
-          throw new BookingValidationError('Nhân viên phục vụ không tồn tại!');
+          throw new BookingValidationError('NhÃ¢n viÃªn phá»¥c vá»¥ khÃ´ng tá»“n táº¡i!');
         }
         if (!service || !service.isActive) {
-          throw new BookingValidationError('Dịch vụ không tồn tại hoặc đã ngừng hoạt động!');
+          throw new BookingValidationError('Dá»‹ch vá»¥ khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ ngá»«ng hoáº¡t Ä‘á»™ng!');
         }
         if (!timeSlot) {
-          throw new BookingValidationError('Khung giờ không tồn tại!');
+          throw new BookingValidationError('Khung giá» khÃ´ng tá»“n táº¡i!');
         }
 
         const booking = await tx.booking.create({
@@ -229,18 +269,31 @@ const buildWhereClause = (filters: BookingFilters): Prisma.BookingWhereInput => 
   }
   if (filters.staffId) {
     if (!isUuid(filters.staffId)) {
-      throw new BookingValidationError('staffId không hợp lệ!');
+      throw new BookingValidationError('staffId khÃ´ng há»£p lá»‡!');
     }
     where.staffId = filters.staffId;
   }
   if (filters.customerId) {
     if (!isUuid(filters.customerId)) {
-      throw new BookingValidationError('customerId không hợp lệ!');
+      throw new BookingValidationError('customerId khÃ´ng há»£p lá»‡!');
     }
     where.customerId = filters.customerId;
   }
 
   return where;
+};
+
+const parseDateOnly = (value: string): Date => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  if (!match) {
+    throw new BookingValidationError('bookingDate không hợp lệ, cần định dạng YYYY-MM-DD!');
+  }
+  const [, year, month, day] = match;
+  const date = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    throw new BookingValidationError('bookingDate không hợp lệ, cần định dạng YYYY-MM-DD!');
+  }
+  return date;
 };
 
 const resolvePagination = (filters: BookingFilters): { page: number; limit: number } => {
@@ -251,6 +304,17 @@ const resolvePagination = (filters: BookingFilters): { page: number; limit: numb
       : 20;
 
   return { page, limit };
+};
+
+const getBookingById = async (id: string): Promise<BookingWithRelations> => {
+  const booking = await prisma.booking.findUnique({
+    where: { id },
+    include: bookingInclude,
+  });
+  if (!booking) {
+    throw new BookingNotFoundError();
+  }
+  return booking;
 };
 
 export const listBookings = async (filters: BookingFilters): Promise<BookingListResult> => {
@@ -305,25 +369,15 @@ export const listMyBookings = async (
   };
 };
 
-export const getBookingById = async (bookingId: string): Promise<BookingWithRelations> => {
-  const booking = await prisma.booking.findUnique({
-    where: { id: bookingId },
-    include: bookingInclude,
-  });
-
-  if (!booking) {
-    throw new BookingNotFoundError();
-  }
-
-  return booking;
-};
-
 export const updateBookingStatus = async (
   bookingId: string,
   status: BookingStatus,
   actor: { userId: string; role: Role }
 ): Promise<BookingWithRelations> => {
-  const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { timeSlot: true },
+  });
 
   if (!booking) {
     throw new BookingNotFoundError();
@@ -331,21 +385,22 @@ export const updateBookingStatus = async (
 
   if (actor.role === Role.CUSTOMER) {
     if (booking.customerId !== actor.userId) {
-      throw new BookingForbiddenError('Forbidden: Bạn không có quyền thay đổi lịch hẹn của người khác!');
+      throw new BookingForbiddenError('Forbidden: Báº¡n khÃ´ng cÃ³ quyá»n thay Ä‘á»•i lá»‹ch háº¹n cá»§a ngÆ°á»i khÃ¡c!');
     }
     if (status !== BookingStatus.CANCELLED) {
-      throw new BookingForbiddenError('Forbidden: Khách hàng chỉ được hủy lịch hẹn!');
+      throw new BookingForbiddenError('Forbidden: KhÃ¡ch hÃ ng chá»‰ Ä‘Æ°á»£c há»§y lá»‹ch háº¹n!');
     }
+    enforceFourHourCutoff(actor.role, booking.bookingDate, booking.timeSlot.startTime);
   } else if (actor.role === Role.STAFF) {
     if (booking.staffId !== actor.userId) {
-      throw new BookingForbiddenError('Forbidden: Bạn không có quyền thay đổi lịch hẹn của nhân viên khác!');
+      throw new BookingForbiddenError('Forbidden: Báº¡n khÃ´ng cÃ³ quyá»n thay Ä‘á»•i lá»‹ch háº¹n cá»§a nhÃ¢n viÃªn khÃ¡c!');
     }
     if (!STAFF_UPDATABLE_STATUSES.includes(status)) {
-      throw new BookingValidationError('Trạng thái không hợp lệ!');
+      throw new BookingValidationError('Tráº¡ng thÃ¡i khÃ´ng há»£p lá»‡!');
     }
   } else if (actor.role === Role.ADMIN) {
     if (!STAFF_UPDATABLE_STATUSES.includes(status)) {
-      throw new BookingValidationError('Trạng thái không hợp lệ!');
+      throw new BookingValidationError('Tráº¡ng thÃ¡i khÃ´ng há»£p lá»‡!');
     }
   }
 
@@ -366,10 +421,186 @@ export const updateBookingStatus = async (
       title: status === BookingStatus.CONFIRMED ? 'Lich hen da duoc xac nhan' : 'Lich hen da bi huy',
       message: status === BookingStatus.CONFIRMED ? 'Lich hen cua ban da duoc xac nhan' : 'Lich hen cua ban da bi huy',
     });
+  } else if (status === BookingStatus.IN_PROGRESS) {
+    await createNotification({
+      userId: updatedBooking.customerId,
+      title: 'Lich hen dang thuc hien',
+      message: 'Lich hen cua ban dang duoc thuc hien',
+    });
+  } else if (status === BookingStatus.NO_SHOW) {
+    await createNotification({
+      userId: updatedBooking.customerId,
+      title: 'Khach khong den',
+      message: 'Lich hen da duoc ghi nhan la khach khong den',
+    });
   }
+
+  sseService.sendToUser(updatedBooking.customerId, { type: 'booking:status', data: updatedBooking });
+  sseService.sendToUser(updatedBooking.staffId, { type: 'booking:status', data: updatedBooking });
 
   return updatedBooking;
 };
 
 export const isBookingStatus = (value: string): value is BookingStatus =>
   Object.values(BookingStatus).includes(value as BookingStatus);
+
+ export const rescheduleBooking = async (
+  bookingId: string,
+  input: RescheduleBookingInput,
+  actor: { userId: string; role: Role }
+): Promise<BookingWithRelations> => {
+  if (!isUuid(bookingId)) {
+    throw new BookingValidationError('ID lá»‹ch háº¹n khÃ´ng há»£p lá»‡!');
+  }
+  if (!isUuid(input.timeSlotId)) {
+    throw new BookingValidationError('timeSlotId khÃ´ng há»£p lá»‡!');
+  }
+  if (input.staffId && !isUuid(input.staffId)) {
+    throw new BookingValidationError('staffId khÃ´ng há»£p lá»‡!');
+  }
+
+  const bookingDate = parseDateOnly(input.bookingDate);
+  const bookingDateOnly = input.bookingDate.trim().slice(0, 10);
+
+  const existing = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { timeSlot: true },
+  });
+  if (!existing) {
+    throw new BookingNotFoundError();
+  }
+
+  if (actor.role === Role.CUSTOMER) {
+    if (existing.customerId !== actor.userId) {
+      throw new BookingForbiddenError('Forbidden: Báº¡n khÃ´ng cÃ³ quyá»n thay Ä‘á»•i lá»‹ch háº¹n cá»§a ngÆ°á»i khÃ¡c!');
+    }
+    enforceFourHourCutoff(actor.role, existing.bookingDate, existing.timeSlot.startTime);
+  } else if (actor.role === Role.STAFF) {
+    if (existing.staffId !== actor.userId) {
+      throw new BookingForbiddenError('Forbidden: Báº¡n khÃ´ng cÃ³ quyá»n thay Ä‘á»•i lá»‹ch háº¹n cá»§a nhÃ¢n viÃªn khÃ¡c!');
+    }
+  }
+
+  const targetStaffId = input.staffId || existing.staffId;
+  const lockKey = buildSlotLockKey(targetStaffId, bookingDateOnly, input.timeSlotId);
+
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        await acquireSlotLock(tx, lockKey);
+
+        const lockedRows = await lockSlotBookings(tx, targetStaffId, bookingDateOnly, input.timeSlotId);
+        const conflicting = lockedRows.filter((row) => row.id !== existing.id);
+        if (conflicting.length > 0) {
+          throw new BookingConflictError();
+        }
+
+        const [staff, timeSlot] = await Promise.all([
+          tx.user.findUnique({ where: { id: targetStaffId }, select: { id: true, role: true } }),
+          tx.timeSlot.findUnique({ where: { id: input.timeSlotId }, select: { id: true } }),
+        ]);
+        if (!staff || staff.role !== Role.STAFF) {
+          throw new BookingValidationError('NhÃ¢n viÃªn phá»¥c vá»¥ khÃ´ng tá»“n táº¡i!');
+        }
+        if (!timeSlot) {
+          throw new BookingValidationError('Khung giá» khÃ´ng tá»“n táº¡i!');
+        }
+
+        const updated = await tx.booking.updateMany({
+          where: { id: existing.id, version: existing.version },
+          data: {
+            staffId: targetStaffId,
+            timeSlotId: input.timeSlotId,
+            bookingDate,
+            version: { increment: 1 },
+            isReminderSent: false,
+            isReminder2hSent: false,
+          },
+        });
+
+        if (updated.count === 0) {
+          throw new BookingConflictError(BOOKING_UPDATED_CONFLICT_MESSAGE);
+        }
+
+        const updatedBooking = await tx.booking.findUnique({
+          where: { id: existing.id },
+          include: bookingInclude,
+        });
+        if (!updatedBooking) {
+          throw new BookingNotFoundError();
+        }
+
+        await createNotification({
+          userId: updatedBooking.customerId,
+          title: 'Lich hen da doi gio',
+          message: 'Lich hen cua ban da duoc doi sang ngay/gio khac',
+        });
+        await createNotification({
+          userId: updatedBooking.staffId,
+          title: 'Lich hen da doi gio',
+          message: 'Co lich hen da duoc doi gio',
+        });
+
+        sseService.sendToUser(updatedBooking.customerId, { type: 'booking:rescheduled', data: updatedBooking });
+        sseService.sendToUser(updatedBooking.staffId, { type: 'booking:rescheduled', data: updatedBooking });
+
+        return updatedBooking;
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 15000,
+        timeout: 20000,
+      }
+    );
+  } catch (error) {
+    if (error instanceof BookingConflictError || error instanceof BookingValidationError || error instanceof BookingForbiddenError || error instanceof BookingNotFoundError) {
+      throw error;
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2034' || error.code === 'P2002') {
+        throw new BookingConflictError();
+      }
+    }
+    throw error;
+  }
+};
+
+export const reviewBooking = async (
+  bookingId: string,
+  input: ReviewBookingInput,
+  actor: { userId: string; role: Role }
+): Promise<BookingWithRelations> => {
+  if (!isUuid(bookingId)) {
+    throw new BookingValidationError('ID lá»‹ch háº¹n khÃ´ng há»£p lá»‡!');
+  }
+  if (!input.rating || input.rating < 1 || input.rating > 5 || !Number.isInteger(input.rating)) {
+    throw new BookingValidationError('rating pháº£i lÃ  sá»‘ nguyÃªn tá»« 1 Ä‘áº¿n 5!');
+  }
+
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+  if (!booking) {
+    throw new BookingNotFoundError();
+  }
+  if (actor.role !== Role.CUSTOMER) {
+    throw new BookingForbiddenError('Forbidden: Chá»‰ khÃ¡ch hÃ ng má»›i Ä‘Æ°á»£c Ä‘Ã¡nh giÃ¡!');
+  }
+  if (booking.customerId !== actor.userId) {
+    throw new BookingForbiddenError('Forbidden: Báº¡n khÃ´ng cÃ³ quyá»n Ä‘Ã¡nh giÃ¡ lá»‹ch háº¹n cá»§a ngÆ°á»i khÃ¡c!');
+  }
+  if (booking.status !== BookingStatus.COMPLETED) {
+    throw new BookingValidationError('Chá»‰ cÃ³ thá»ƒ Ä‘Ã¡nh giÃ¡ lá»‹ch háº¹n Ä‘Ã£ hoÃ n thÃ nh!');
+  }
+  if (booking.rating !== null) {
+    throw new BookingValidationError('Lá»‹ch háº¹n nÃ y Ä‘Ã£ Ä‘Æ°á»£c Ä‘Ã¡nh giÃ¡!');
+  }
+
+  await prisma.booking.update({
+    where: { id: booking.id },
+    data: {
+      rating: input.rating,
+      reviewComment: input.reviewComment ?? null,
+    },
+  });
+
+  return getBookingById(booking.id);
+};

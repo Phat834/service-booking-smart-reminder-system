@@ -40,3 +40,28 @@ export const getAvailableSlots = async (req: Request, res: Response, next: NextF
     next(error);
   }
 };
+
+export const getSlots = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const slots = await prisma.timeSlot.findMany({ orderBy: { startTime: 'asc' } });
+    res.status(200).json({ slots });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createSlot = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { startTime, endTime } = req.body;
+    if (!startTime || !endTime) {
+      res.status(400).json({ message: 'startTime và endTime là bắt buộc!' });
+      return;
+    }
+    const slot = await prisma.timeSlot.create({
+      data: { startTime, endTime },
+    });
+    res.status(201).json({ slot });
+  } catch (error) {
+    next(error);
+  }
+};

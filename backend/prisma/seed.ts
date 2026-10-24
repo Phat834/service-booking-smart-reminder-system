@@ -29,11 +29,11 @@ async function main() {
   });
 
   const services = await Promise.all([
-    prisma.service.create({ data: { name: "Haircut", description: "Basic haircut", durationMinutes: 30, price: 100000, isActive: true } }),
-    prisma.service.create({ data: { name: "Hair Coloring", description: "Full hair coloring", durationMinutes: 90, price: 500000, isActive: true } }),
-    prisma.service.create({ data: { name: "Manicure", description: "Nail care", durationMinutes: 45, price: 150000, isActive: true } }),
-    prisma.service.create({ data: { name: "Facial", description: "Skin facial treatment", durationMinutes: 60, price: 300000, isActive: true } }),
-    prisma.service.create({ data: { name: "Massage", description: "Relaxing massage", durationMinutes: 60, price: 400000, isActive: true } }),
+    prisma.service.create({ data: { name: "Haircut", description: "Basic haircut", durationMinutes: 30, bufferMinutes: 15, price: 100000, isActive: true } }),
+    prisma.service.create({ data: { name: "Hair Coloring", description: "Full hair coloring", durationMinutes: 90, bufferMinutes: 15, price: 500000, isActive: true } }),
+    prisma.service.create({ data: { name: "Manicure", description: "Nail care", durationMinutes: 45, bufferMinutes: 10, price: 150000, isActive: true } }),
+    prisma.service.create({ data: { name: "Facial", description: "Skin facial treatment", durationMinutes: 60, bufferMinutes: 15, price: 300000, isActive: true } }),
+    prisma.service.create({ data: { name: "Massage", description: "Relaxing massage", durationMinutes: 60, bufferMinutes: 15, price: 400000, isActive: true } }),
   ]);
 
   const slotDefs = [

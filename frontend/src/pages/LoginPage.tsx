@@ -50,7 +50,9 @@ const LoginPage = () => {
         throw new Error('Không nhận được token từ server');
       }
       login(token, user);
-      navigate('/');
+      if (user.role === 'ADMIN') navigate('/admin');
+      else if (user.role === 'STAFF') navigate('/staff');
+      else navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
     } finally {
