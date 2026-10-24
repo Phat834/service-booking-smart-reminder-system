@@ -143,10 +143,11 @@ const MyBookingsPage: React.FC = () => {
     if (!rescheduleSelectedSlot) return;
     setRescheduleLoading(true);
     try {
-      await axiosClient.patch(`/bookings/${rescheduleId}/reschedule`, {
+      const res = await axiosClient.patch(`/bookings/${rescheduleId}/reschedule`, {
         bookingDate: rescheduleDate,
         timeSlotId: rescheduleSelectedSlot.id,
       });
+      const updatedBooking = res.data.booking;
       toast({
         title: 'Đã đổi lịch',
         message: 'Lịch hẹn của bạn đã được đổi lịch thành công.',
@@ -155,7 +156,9 @@ const MyBookingsPage: React.FC = () => {
       });
       setBookings((prev) =>
         prev.map((b) =>
-          b.id === rescheduleId ? { ...b, status: b.status, bookingDate: new Date(rescheduleDate) } : b
+          b.id === rescheduleId
+            ? { ...b, bookingDate: updatedBooking.bookingDate, timeSlot: updatedBooking.timeSlot }
+            : b
         )
       );
       setRescheduleOpen(false);

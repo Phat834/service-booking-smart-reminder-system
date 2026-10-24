@@ -3,7 +3,9 @@ import { prisma } from '../config/prisma';
 
 export const getServices = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const services = await prisma.service.findMany({ where: { isActive: true } });
+    const showAll = req.query.all === 'true' || req.user?.role === 'ADMIN';
+    const where = showAll ? {} : { isActive: true };
+    const services = await prisma.service.findMany({ where, orderBy: { name: 'asc' } });
     res.status(200).json({ services });
   } catch (error) {
     next(error);

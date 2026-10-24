@@ -23,6 +23,7 @@ export interface Staff {
   fullName: string;
   email: string;
   phone?: string | null;
+  isActive: boolean;
   bookingCount?: number;
   averageRating?: number | null;
 }

@@ -132,8 +132,8 @@ export const getStaffList = async (req: Request, res: Response, next: NextFuncti
   try {
     const staff = await prisma.user.findMany({
       where: { role: Role.STAFF },
-      select: { id: true, fullName: true, email: true, phone: true, createdAt: true },
-      orderBy: { fullName: 'asc' },
+      select: { id: true, fullName: true, email: true, phone: true, isActive: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
     });
 
     const staffWithStats = await Promise.all(
@@ -152,6 +152,51 @@ export const getStaffList = async (req: Request, res: Response, next: NextFuncti
 
     res.status(200).json({ staff: staffWithStats });
   } catch (error) {
+    console.error('getStaffList error:', error);
+    next(error);
+  }
+};
+
+export const toggleStaffStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const staff = await prisma.user.findUnique({ where: { id } });
+    if (!staff) {
+      res.status(404).json({ message: 'Không tìm thấy nhân viên!' });
+      return;
+    }
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { isActive: !staff.isActive },
+    });
+    res.status(200).json({ staff: updated });
+  } catch (error) {
+    console.error('toggleStaffStatus error:', error);
+    next(error);
+  }
+};
+
+export const updateStaff = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { fullName, phone } = req.body;
+
+    const staff = await prisma.user.findUnique({ where: { id } });
+    if (!staff) {
+      res.status(404).json({ message: 'Không tìm thấy nhân viên!' });
+      return;
+    }
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: {
+        ...(fullName !== undefined ? { fullName } : {}),
+        ...(phone !== undefined ? { phone } : {}),
+      },
+    });
+    res.status(200).json({ staff: updated });
+  } catch (error) {
+    console.error('updateStaff error:', error);
     next(error);
   }
 };

@@ -57,6 +57,8 @@ const AdminDashboardPage: React.FC = () => {
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffForm, setStaffForm] = useState({ fullName: '', email: '', phone: '', password: '' });
   const [submittingStaff, setSubmittingStaff] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
+  const [staffEditForm, setStaffEditForm] = useState({ fullName: '', phone: '' });
 
   // TimeSlot state
   const [slotForm, setSlotForm] = useState({ startTime: '', endTime: '' });
@@ -120,16 +122,17 @@ const AdminDashboardPage: React.FC = () => {
     e.preventDefault();
     setSubmittingService(true);
     try {
-      await axiosClient.post('/services', {
+      const res = await axiosClient.post('/services', {
         name: serviceForm.name,
         description: serviceForm.description,
         durationMinutes: Number(serviceForm.durationMinutes),
         price: Number(serviceForm.price),
         bufferMinutes: serviceForm.bufferMinutes ? Number(serviceForm.bufferMinutes) : undefined,
       });
+      const createdService = res.data.service;
       toast({ title: 'Thành công', message: 'Tạo dịch vụ mới thành công', type: 'success' });
       setServiceForm({ name: '', description: '', durationMinutes: '', price: '', bufferMinutes: '' });
-      fetchServices();
+      setServices((prev) => [...prev, createdService]);
     } catch (err: any) {
       toast({ title: 'Lỗi', message: err.response?.data?.message || 'Tạo dịch vụ thất bại', type: 'error' });
     } finally {
@@ -154,7 +157,7 @@ const AdminDashboardPage: React.FC = () => {
     if (!editingService) return;
     setSubmittingService(true);
     try {
-      await axiosClient.put(`/services/${editingService.id}`, {
+      const res = await axiosClient.put(`/services/${editingService.id}`, {
         name: editForm.name,
         description: editForm.description,
         durationMinutes: Number(editForm.durationMinutes),
@@ -162,9 +165,12 @@ const AdminDashboardPage: React.FC = () => {
         bufferMinutes: editForm.bufferMinutes ? Number(editForm.bufferMinutes) : undefined,
         isActive: editForm.isActive,
       });
+      const updatedService = res.data.service;
       toast({ title: 'Thành công', message: 'Cập nhật dịch vụ thành công', type: 'success' });
       setEditingService(null);
-      fetchServices();
+      setServices((prev) =>
+        prev.map((s) => (s.id === updatedService.id ? { ...s, ...updatedService } : s))
+      );
     } catch (err: any) {
       toast({ title: 'Lỗi', message: err.response?.data?.message || 'Cập nhật dịch vụ thất bại', type: 'error' });
     } finally {
@@ -173,11 +179,17 @@ const AdminDashboardPage: React.FC = () => {
   };
 
   const handleToggleService = async (service: Service) => {
+    const previousIsActive = service.isActive;
+    setServices((prev) =>
+      prev.map((s) => (s.id === service.id ? { ...s, isActive: !previousIsActive } : s))
+    );
     try {
       await axiosClient.patch(`/services/${service.id}/toggle`);
-      toast({ title: 'Thành công', message: `Dịch vụ đã ${service.isActive ? 'đã khóa' : 'đã kích hoạt'}`, type: 'success' });
-      fetchServices();
+      toast({ title: 'Thành công', message: `Dịch vụ đã ${previousIsActive ? 'đã khóa' : 'đã kích hoạt'}`, type: 'success' });
     } catch (err: any) {
+      setServices((prev) =>
+        prev.map((s) => (s.id === service.id ? { ...s, isActive: previousIsActive } : s))
+      );
       toast({ title: 'Lỗi', message: err.response?.data?.message || 'Thao tác thất bại', type: 'error' });
     }
   };
@@ -204,17 +216,56 @@ const AdminDashboardPage: React.FC = () => {
     e.preventDefault();
     setSubmittingStaff(true);
     try {
-      await axiosClient.post('/admin/staff', {
+      const res = await axiosClient.post('/admin/staff', {
         fullName: staffForm.fullName,
         email: staffForm.email,
         phone: staffForm.phone,
         password: staffForm.password,
       });
+      const createdStaff = res.data.staff;
       toast({ title: 'Thành công', message: 'Tạo tài khoản nhân viên thành công', type: 'success' });
       setStaffForm({ fullName: '', email: '', phone: '', password: '' });
-      fetchStaff();
+      setStaffList((prev) => [...prev, createdStaff]);
     } catch (err: any) {
       toast({ title: 'Lỗi', message: err.response?.data?.message || 'Tạo nhân viên thất bại', type: 'error' });
+    } finally {
+      setSubmittingStaff(false);
+    }
+  };
+
+  const handleToggleStaffStatus = async (staff: Staff) => {
+    const previousIsActive = staff.isActive;
+    setStaffList((prev) =>
+      prev.map((s) => (s.id === staff.id ? { ...s, isActive: !previousIsActive } : s))
+    );
+    try {
+      await axiosClient.patch(`/admin/staff/${staff.id}/toggle`);
+      toast({ title: 'Thành công', message: `Nhân viên đã ${previousIsActive ? 'đã khóa' : 'đã kích hoạt'}`, type: 'success' });
+    } catch (err: any) {
+      setStaffList((prev) =>
+        prev.map((s) => (s.id === staff.id ? { ...s, isActive: previousIsActive } : s))
+      );
+      toast({ title: 'Lỗi', message: err.response?.data?.message || 'Thao tác thất bại', type: 'error' });
+    }
+  };
+
+  const handleUpdateStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStaff) return;
+    setSubmittingStaff(true);
+    try {
+      const res = await axiosClient.put(`/admin/staff/${editingStaff.id}`, {
+        fullName: staffEditForm.fullName,
+        phone: staffEditForm.phone,
+      });
+      const updatedStaff = res.data.staff;
+      toast({ title: 'Thành công', message: 'Cập nhật nhân viên thành công', type: 'success' });
+      setEditingStaff(null);
+      setStaffList((prev) =>
+        prev.map((s) => (s.id === updatedStaff.id ? { ...s, ...updatedStaff } : s))
+      );
+    } catch (err: any) {
+      toast({ title: 'Lỗi', message: err.response?.data?.message || 'Cập nhật nhân viên thất bại', type: 'error' });
     } finally {
       setSubmittingStaff(false);
     }
@@ -403,21 +454,28 @@ const AdminDashboardPage: React.FC = () => {
                         <td className="px-4 py-3 text-sm">{formatVND(s.price)}</td>
                         <td className="px-4 py-3 text-sm">{s.bufferMinutes ?? '—'}</td>
                         <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mb-1 block transition-colors ${
+                            s.isActive
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-200 text-gray-600'
+                          }`}>
+                            {s.isActive ? 'Hoạt động' : 'Đã khóa'}
+                          </span>
                           <button
                             onClick={() => handleToggleService(s)}
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${
                               s.isActive
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-red-100 text-red-700'
+                                ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                : 'bg-green-100 text-green-700 hover:bg-green-200'
                             }`}
                           >
                             {s.isActive ? (
                               <>
-                                <ToggleRight className="w-3 h-3 mr-1" /> Kích hoạt
+                                <ToggleLeft className="w-3 h-3 mr-1" /> Khóa
                               </>
                             ) : (
                               <>
-                                <ToggleLeft className="w-3 h-3 mr-1" /> Khóa
+                                <ToggleRight className="w-3 h-3 mr-1" /> Kích hoạt
                               </>
                             )}
                           </button>
@@ -585,8 +643,11 @@ const AdminDashboardPage: React.FC = () => {
                     <tr className="bg-gray-50 border-b">
                       <th className="px-4 py-3 text-sm font-semibold text-gray-700">Họ tên</th>
                       <th className="px-4 py-3 text-sm font-semibold text-gray-700">Email</th>
+                      <th className="px-4 py-3 text-sm font-semibold text-gray-700">Số điện thoại</th>
                       <th className="px-4 py-3 text-sm font-semibold text-gray-700">Số lịch hẹn</th>
                       <th className="px-4 py-3 text-sm font-semibold text-gray-700">Đánh giá TB</th>
+                      <th className="px-4 py-3 text-sm font-semibold text-gray-700">Trạng thái</th>
+                      <th className="px-4 py-3 text-sm font-semibold text-gray-700 text-right">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -594,9 +655,44 @@ const AdminDashboardPage: React.FC = () => {
                       <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 text-sm">{s.fullName}</td>
                         <td className="px-4 py-3 text-sm">{s.email}</td>
+                        <td className="px-4 py-3 text-sm">{s.phone || '—'}</td>
                         <td className="px-4 py-3 text-sm">{s.bookingCount ?? 0}</td>
                         <td className="px-4 py-3 text-sm">
                           {s.averageRating != null ? s.averageRating.toFixed(1) : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                            s.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+                          }`}>
+                            {s.isActive ? 'Hoạt động' : 'Đã khóa'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right space-x-2">
+                          <button
+                            onClick={() => handleToggleStaffStatus(s)}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                              s.isActive ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'
+                            }`}
+                          >
+                            {s.isActive ? (
+                              <>
+                                <ToggleLeft className="w-3 h-3 mr-1" /> Khóa
+                              </>
+                            ) : (
+                              <>
+                                <ToggleRight className="w-3 h-3 mr-1" /> Kích hoạt
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setStaffEditForm({ fullName: s.fullName, phone: s.phone || '' });
+                              setEditingStaff(s);
+                            }}
+                            className="text-brand-600 text-sm hover:underline font-medium"
+                          >
+                            Sửa
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -648,6 +744,51 @@ const AdminDashboardPage: React.FC = () => {
               </button>
             </form>
           </div>
+
+          {editingStaff && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingStaff(null)}>
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6 relative" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => setEditingStaff(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                  <span className="sr-only">Đóng</span>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                <h2 className="text-lg font-semibold mb-4 text-gray-900">Sửa nhân viên</h2>
+                <form onSubmit={handleUpdateStaff} className="space-y-3">
+                  <input
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Họ tên"
+                    value={staffEditForm.fullName}
+                    onChange={(e) => setStaffEditForm({ ...staffEditForm, fullName: e.target.value })}
+                    required
+                  />
+                  <input
+                    type="tel"
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Số điện thoại"
+                    value={staffEditForm.phone}
+                    onChange={(e) => setStaffEditForm({ ...staffEditForm, phone: e.target.value })}
+                  />
+                  <div className="flex justify-end gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setEditingStaff(null)}
+                      className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      disabled={submittingStaff}
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingStaff}
+                      className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                    >
+                      {submittingStaff ? 'Đang lưu...' : 'Lưu thay đổi'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
           <div className="bg-white p-6 rounded-xl border shadow-sm">
             <h2 className="font-semibold text-gray-900 mb-4">Thêm khung giờ làm việc</h2>
